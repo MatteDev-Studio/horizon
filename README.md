@@ -7,17 +7,24 @@ Applicazione web meteo funzionante con autenticazione Firebase, previsioni meteo
 ```
 mdev-horizon/
 ├── index.html              # Landing page (redirect a login)
-├── dashboard.html          # Dashboard principale
+├── dashboard.html          # Dashboard principale (UI moderna dal bozzetto)
+├── selectcity.html         # Redirect a pages/selectcity.html
+├── view7days.html          # Redirect a pages/view7days.html
 ├── auth.js                 # Logica autenticazione Firebase + tab switching
 ├── css/
-│   └── app.css            # Foglio di stile unificato
+│   └── app.css            # Foglio di stile unificato con design mobile & desktop
 ├── js/
-│   ├── app.js             # Logica UI dashboard + weather
-│   └── weather.js         # Fetch Open-Meteo API (gratuita)
+│   ├── app.js             # Logica UI dashboard + capsule orarie e popup
+│   ├── icons.js           # Icone SVG vettoriali per meteo e UI
+│   ├── selectcity.js      # Logica ricerca città, GPS e cronologia
+│   ├── view7days.js       # Previsioni settimanali a 7 giorni e timeline orarie
+│   └── weather.js         # Fetch Open-Meteo API (orari, UV, vento, 7 giorni)
 └── pages/
     ├── login.html         # Pagina login/registrazione
     ├── emailverify.html   # Verifica email post-registrazione
-    └── profile.html       # Profilo utente + preferenze
+    ├── profile.html       # Profilo utente + preferenze
+    ├── selectcity.html    # Ricerca dedicata e selezione città
+    └── view7days.html     # Previsioni dettagliate a 7 giorni
 ```
 
 ## Configurazione

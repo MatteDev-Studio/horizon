@@ -2,41 +2,160 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Dashboard — Meteo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Meteo — Dashboard</title>
   <link rel="stylesheet" href="/css/app.css">
-  <meta name="theme-color" content="#050507">
+  <meta name="theme-color" content="#1a365d">
 </head>
-<body>
-  <header class="topbar">
-    <div class="brand">Meteo</div>
-    <nav>
-      <button id="profileBtn" class="link">Profilo</button>
-      <button id="logoutBtn" class="link">Esci</button>
-    </nav>
-  </header>
-
-  <main class="container">
-    <section class="search">
-      <input id="cityInput" placeholder="Inserisci una città" />
-      <button id="searchBtn" class="btn-primary">Cerca</button>
-    </section>
-
-    <section id="weatherCard" class="card weather-card">
-      <div id="loading">Caricamento meteo...</div>
-      <div id="weather" style="display:none">
-        <h2 id="place"></h2>
-        <div id="temp" class="temp"></div>
-        <div id="desc" class="muted"></div>
-        <div id="details" class="muted small"></div>
+<body class="weather-app-page">
+  <div class="app-container">
+    <!-- Topbar -->
+    <header class="app-topbar">
+      <div class="brand-badge">Meteo</div>
+      <div class="topbar-right">
+        <button id="logoutBtn" class="link-small" type="button">Esci</button>
       </div>
-    </section>
+    </header>
 
-    <section id="forecastSection" class="card forecast-section" style="display:none">
-      <h3>Previsioni prossimi giorni</h3>
-      <div id="forecastGrid" class="forecast-grid"></div>
-    </section>
-  </main>
+    <main class="dashboard-main">
+      <!-- Loading State -->
+      <div id="loadingBox" class="card loading-card">
+        <div class="spinner"></div>
+        <p>Caricamento meteo in corso...</p>
+      </div>
+
+      <!-- Main Weather Card matching the sketch -->
+      <section id="heroWeatherCard" class="card hero-weather-card" style="display:none">
+        <div class="hero-top-row">
+          <div class="hero-place-group">
+            <h1 id="place" class="hero-place">Città, Italia</h1>
+            <div id="todayDate" class="hero-date">Oggi, Data</div>
+          </div>
+          <div class="hero-nav-pill">
+            <a href="/pages/selectcity.html" class="hero-pill-btn" id="navSelectCityBtn" title="Seleziona o cerca città">
+              <span id="navLocationIcon"></span>
+            </a>
+            <span class="pill-divider"></span>
+            <a href="/pages/profile.html" class="hero-pill-btn" id="navProfileBtn" title="Profilo utente e impostazioni">
+              <span id="navProfileIcon"></span>
+            </a>
+          </div>
+        </div>
+
+        <div class="hero-center-row">
+          <div id="weatherIllustration" class="hero-illustration-wrap"></div>
+          <div class="hero-temp-group">
+            <div id="temp" class="hero-temp">--°</div>
+            <div id="desc" class="hero-condition">Caricamento...</div>
+            <div class="hero-submetrics">
+              <span id="heroMinMax" class="hero-submetric-item">Min --° • Max --°</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-bottom-pills">
+          <div class="hero-mini-pill" id="heroWindPill">
+            <span id="heroWindIcon"></span>
+            <span id="heroWindText">-- km/h</span>
+          </div>
+          <div class="hero-mini-pill" id="heroUvPill">
+            <span id="heroUvIcon"></span>
+            <span id="heroUvText">UV --</span>
+          </div>
+          <div class="hero-mini-pill" id="heroHumidityPill">
+            <span id="heroHumidityIcon"></span>
+            <span id="heroHumidityText">--%</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Hourly Forecast Row (Horizontal Capsules) -->
+      <section id="hourlySection" class="hourly-capsules-section" style="display:none">
+        <div class="section-sub-header">
+          <span class="sub-label">Previsioni a orario</span>
+          <span class="sub-hint muted">Tocca per info dettagliate</span>
+        </div>
+        <div id="hourlyCapsulesTrack" class="hourly-capsules-track"></div>
+      </section>
+
+      <!-- Bottom Action Banner: "Visualizza i prossimi giorni →" -->
+      <section id="bannerSection" class="banner-section" style="display:none">
+        <a href="/pages/view7days.html" class="banner-7days-link" id="view7DaysBanner">
+          <div class="banner-text-group">
+            <span class="banner-main-title">Visualizza i prossimi giorni</span>
+            <span class="banner-sub-title">Previsioni complete per 7 giorni</span>
+          </div>
+          <div class="banner-arrow-wrap" id="bannerArrowIcon"></div>
+        </a>
+      </section>
+    </main>
+
+    <!-- Modal / Popup per info orarie dettagliate -->
+    <div id="hourlyModal" class="modal-backdrop" style="display:none" role="dialog" aria-modal="true" aria-labelledby="modalHourTitle">
+      <div class="modal-card">
+        <div class="modal-head">
+          <div>
+            <div id="modalDayDate" class="modal-day-subtitle">Giovedì 10 Settembre</div>
+            <h3 id="modalHourTitle" class="modal-title">Previsioni delle 12:00</h3>
+          </div>
+          <button type="button" id="modalCloseBtn" class="modal-close-btn" aria-label="Chiudi">
+            <span id="modalCloseIcon"></span>
+          </button>
+        </div>
+
+        <div class="modal-hero-row">
+          <div id="modalWeatherIcon" class="modal-weather-icon"></div>
+          <div>
+            <div id="modalTemp" class="modal-temp">--°</div>
+            <div id="modalCondition" class="modal-condition">--</div>
+            <div id="modalApparent" class="muted small">Percepita: --°</div>
+          </div>
+        </div>
+
+        <div class="modal-grid">
+          <div class="modal-stat-box">
+            <div class="modal-stat-head">
+              <span id="modalStatWindIcon"></span>
+              <span>Vento</span>
+            </div>
+            <div id="modalStatWind" class="modal-stat-val">-- km/h</div>
+            <div id="modalStatWindDir" class="modal-stat-sub">Direzione: --</div>
+          </div>
+
+          <div class="modal-stat-box">
+            <div class="modal-stat-head">
+              <span id="modalStatUvIcon"></span>
+              <span>Indice UV</span>
+            </div>
+            <div id="modalStatUv" class="modal-stat-val">--</div>
+            <div id="modalStatUvLevel" class="modal-stat-sub">Basso</div>
+          </div>
+
+          <div class="modal-stat-box">
+            <div class="modal-stat-head">
+              <span id="modalStatRainIcon"></span>
+              <span>Pioggia</span>
+            </div>
+            <div id="modalStatRain" class="modal-stat-val">0%</div>
+            <div id="modalStatRainQty" class="modal-stat-sub">0 mm</div>
+          </div>
+
+          <div class="modal-stat-box">
+            <div class="modal-stat-head">
+              <span id="modalStatHumIcon"></span>
+              <span>Umidità</span>
+            </div>
+            <div id="modalStatHum" class="modal-stat-val">--%</div>
+            <div class="modal-stat-sub">Relativa</div>
+          </div>
+        </div>
+
+        <div class="modal-footer-row">
+          <button type="button" id="modalBottomCloseBtn" class="btn-modal-close">Chiudi</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="/js/app.js"></script>
 </body>

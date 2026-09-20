@@ -1,34 +1,32 @@
 import { auth, db } from '/auth.js';
-import { fetchWeatherByCity } from './weather.js';
-import { doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+import { fetchWeatherByCity, getUvRisk } from './weather.js';
+import { getIconSvg, getWeatherSvg } from './icons.js';
+import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
-const ui = {
-  cityInput: () => document.getElementById('cityInput'),
-  searchBtn: () => document.getElementById('searchBtn'),
-  weatherCard: () => document.getElementById('weatherCard'),
-  forecastSection: () => document.getElementById('forecastSection'),
-  forecastGrid: () => document.getElementById('forecastGrid'),
-  place: () => document.getElementById('place'),
-  temp: () => document.getElementById('temp'),
-  desc: () => document.getElementById('desc'),
-  details: () => document.getElementById('details'),
-  loading: () => document.getElementById('loading'),
-  weather: () => document.getElementById('weather')
-};
-
 let currentUnits = 'metric';
+let currentCity = 'Milano';
+let weatherData = null;
 
-function formatDate(dateStr) {
-  const date = new Date(dateStr);
-  const days = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
-  const months = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
-  return `${days[date.getUTCDay()]} ${date.getUTCDate()} ${months[date.getUTCMonth()]}`;
+function formatFullDate(dateStr) {
+  const date = new Date(dateStr + 'T00:00:00');
+  const months = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
+  return `Oggi, ${date.getDate()} ${months[date.getMonth()]}`;
 }
 
-function toDisplayTemp(value) {
+function formatModalDate(dateStr) {
+  const date = new Date(dateStr + 'T00:00:00');
+  const days = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'];
+  const months = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
+  return `${days[date.getDay()]} ${date.getDate()} ${months[date.getMonth()]}`;
+}
+
+function toDisplayTemp(value, includeUnit = false) {
   if (value == null) return '—';
-  return currentUnits === 'imperial' ? `${Math.round((value * 9) / 5 + 32)}°F` : `${Math.round(value)}°C`;
+  if (includeUnit) {
+    return currentUnits === 'imperial' ? `${Math.round((value * 9) / 5 + 32)} °F` : `${Math.round(value)} °C`;
+  }
+  return currentUnits === 'imperial' ? `${Math.round((value * 9) / 5 + 32)}°` : `${Math.round(value)}°`;
 }
 
 function toDisplayWind(value) {
@@ -36,129 +34,313 @@ function toDisplayWind(value) {
   return currentUnits === 'imperial' ? `${Math.round(value * 0.621371)} mph` : `${Math.round(value)} km/h`;
 }
 
-function toDisplayPrecipitation(value) {
+function toDisplayPrecip(value) {
   if (value == null) return '0';
   return currentUnits === 'imperial' ? (value * 0.0393701).toFixed(1) : value.toFixed(1);
 }
 
-async function renderForecast(forecast) {
-  const section = ui.forecastSection();
-  const grid = ui.forecastGrid();
+function renderHeroCard(data) {
+  const placeEl = document.getElementById('place');
+  const todayDateEl = document.getElementById('todayDate');
+  const tempEl = document.getElementById('temp');
+  const descEl = document.getElementById('desc');
+  const illustrationEl = document.getElementById('weatherIllustration');
+  const minMaxEl = document.getElementById('heroMinMax');
+  const windText = document.getElementById('heroWindText');
+  const uvText = document.getElementById('heroUvText');
+  const humText = document.getElementById('heroHumidityText');
 
-  if (!section || !grid) return;
+  const fullPlace = `${data.name || currentCity}${data.country ? `, ${data.country}` : ''}`;
+  if (placeEl) placeEl.textContent = fullPlace;
 
-  if (!forecast || forecast.length === 0) {
+  const today = data.today;
+  if (todayDateEl && today) {
+    todayDateEl.textContent = formatFullDate(today.date);
+  }
+
+  if (tempEl) tempEl.textContent = toDisplayTemp(data.temp, true);
+  if (descEl) descEl.textContent = data.description || 'Condizioni attuali';
+
+  // Weather SVG Illustration
+  if (illustrationEl) {
+    illustrationEl.innerHTML = getWeatherSvg(data.weathercode, false, 'hero-illustration-svg');
+  }
+
+  // Min/Max
+  if (minMaxEl && today) {
+    minMaxEl.textContent = `Min ${toDisplayTemp(today.tempMin)} • Max ${toDisplayTemp(today.tempMax)}`;
+  }
+
+  // Vento
+  if (windText) {
+    windText.textContent = toDisplayWind(data.wind_speed);
+  }
+
+  // UV
+  if (uvText && today) {
+    uvText.textContent = `UV ${today.uvIndexMax != null ? Number(today.uvIndexMax).toFixed(0) : '—'}`;
+  }
+
+  // Umidità
+  if (humText) {
+    humText.textContent = `${data.humidity ?? '—'}%`;
+  }
+
+  const heroCard = document.getElementById('heroWeatherCard');
+  if (heroCard) heroCard.style.display = 'block';
+}
+
+function openHourlyModal(hourData, dayDate) {
+  const modal = document.getElementById('hourlyModal');
+  if (!modal || !hourData) return;
+
+  const modalDayDate = document.getElementById('modalDayDate');
+  const modalHourTitle = document.getElementById('modalHourTitle');
+  const modalWeatherIcon = document.getElementById('modalWeatherIcon');
+  const modalTemp = document.getElementById('modalTemp');
+  const modalCondition = document.getElementById('modalCondition');
+  const modalApparent = document.getElementById('modalApparent');
+  const modalStatWind = document.getElementById('modalStatWind');
+  const modalStatWindDir = document.getElementById('modalStatWindDir');
+  const modalStatUv = document.getElementById('modalStatUv');
+  const modalStatUvLevel = document.getElementById('modalStatUvLevel');
+  const modalStatRain = document.getElementById('modalStatRain');
+  const modalStatRainQty = document.getElementById('modalStatRainQty');
+  const modalStatHum = document.getElementById('modalStatHum');
+
+  if (modalDayDate && dayDate) modalDayDate.textContent = formatModalDate(dayDate);
+  if (modalHourTitle) modalHourTitle.textContent = `Previsioni delle ${hourData.time}`;
+
+  if (modalWeatherIcon) {
+    modalWeatherIcon.innerHTML = getWeatherSvg(hourData.weathercode, hourData.isNight, 'modal-svg');
+  }
+
+  if (modalTemp) modalTemp.textContent = toDisplayTemp(hourData.temp);
+  if (modalCondition) modalCondition.textContent = hourData.description;
+  if (modalApparent) {
+    modalApparent.textContent = `Percepita: ${toDisplayTemp(hourData.apparentTemp)}`;
+  }
+
+  if (modalStatWind) modalStatWind.textContent = toDisplayWind(hourData.windSpeed);
+  if (modalStatWindDir) modalStatWindDir.textContent = `Direzione: ${hourData.windDirection || '—'}`;
+
+  const uvInfo = getUvRisk(hourData.uvIndex);
+  if (modalStatUv) modalStatUv.textContent = hourData.uvIndex != null ? Number(hourData.uvIndex).toFixed(1) : '0';
+  if (modalStatUvLevel) {
+    modalStatUvLevel.textContent = uvInfo.level;
+    modalStatUvLevel.style.color = uvInfo.color;
+  }
+
+  if (modalStatRain) modalStatRain.textContent = `${hourData.precipitationProb ?? 0}%`;
+  const unit = currentUnits === 'imperial' ? 'in' : 'mm';
+  if (modalStatRainQty) modalStatRainQty.textContent = `${toDisplayPrecip(hourData.precipitation)} ${unit}`;
+
+  if (modalStatHum) modalStatHum.textContent = `${hourData.humidity ?? '—'}%`;
+
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeHourlyModal() {
+  const modal = document.getElementById('hourlyModal');
+  if (modal) {
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+}
+
+function renderHourlyCapsules(data) {
+  const section = document.getElementById('hourlySection');
+  const track = document.getElementById('hourlyCapsulesTrack');
+  if (!section || !track) return;
+
+  const today = data.today;
+  if (!today || !today.hourly || today.hourly.length === 0) {
     section.style.display = 'none';
     return;
   }
 
-  grid.innerHTML = '';
-  forecast.forEach((day) => {
-    const card = document.createElement('div');
-    card.className = 'forecast-day';
-    card.innerHTML = `
-      <div class="forecast-date">${formatDate(day.date)}</div>
-      <div class="forecast-desc">${day.description}</div>
-      <div class="forecast-temps">
-        <span class="temp-max">${toDisplayTemp(day.tempMax)}</span>
-        <span class="temp-min">${toDisplayTemp(day.tempMin)}</span>
-      </div>
-      <div class="forecast-precip">🌧 ${toDisplayPrecipitation(day.precipitation)} ${currentUnits === 'imperial' ? 'in' : 'mm'}</div>
+  track.innerHTML = '';
+
+  const now = new Date();
+  const currentHour = now.getHours();
+
+  // Combine today's remaining hours + tomorrow morning hours to give a fluid 24h sequence
+  const combinedHours = [];
+  const todayDate = today.date;
+
+  today.hourly.forEach((h) => {
+    combinedHours.push({ ...h, dayDate: todayDate });
+  });
+
+  if (data.allDays && data.allDays.length > 1) {
+    const tomorrow = data.allDays[1];
+    if (tomorrow.hourly) {
+      tomorrow.hourly.forEach((h) => {
+        combinedHours.push({ ...h, dayDate: tomorrow.date });
+      });
+    }
+  }
+
+  // Find index closest to current hour today
+  let startIndex = today.hourly.findIndex((h) => h.hour >= currentHour);
+  if (startIndex === -1) startIndex = 0;
+
+  // Take 12-16 capsules starting from current time
+  const slice = combinedHours.slice(startIndex, startIndex + 16);
+
+  slice.forEach((h, idx) => {
+    const capsule = document.createElement('div');
+    capsule.className = `hourly-capsule ${h.isNight ? 'is-night' : 'is-day'}`;
+    capsule.setAttribute('role', 'button');
+    capsule.setAttribute('tabindex', '0');
+
+    const isNow = idx === 0 && h.dayDate === todayDate;
+    const timeLabel = isNow ? 'Adesso' : h.time;
+
+    capsule.innerHTML = `
+      <div class="capsule-time">${timeLabel}</div>
+      <div class="capsule-icon">${getWeatherSvg(h.weathercode, h.isNight, 'capsule-svg')}</div>
+      <div class="capsule-temp">${toDisplayTemp(h.temp)}</div>
+      ${h.precipitationProb > 0 ? `<div class="capsule-pill">💧 ${h.precipitationProb}%</div>` : ''}
     `;
-    grid.appendChild(card);
+
+    capsule.addEventListener('click', () => openHourlyModal(h, h.dayDate));
+    capsule.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openHourlyModal(h, h.dayDate);
+      }
+    });
+
+    track.appendChild(capsule);
   });
 
   section.style.display = 'block';
 }
 
-async function renderWeather(data) {
-  if (ui.loading()) ui.loading().style.display = 'none';
-  if (ui.weather()) ui.weather().style.display = 'block';
-
-  if (ui.place()) ui.place().textContent = `${data.name || ''}${data.country ? `, ${data.country}` : ''}`;
-  if (ui.temp()) ui.temp().textContent = toDisplayTemp(data.temp);
-  if (ui.desc()) ui.desc().textContent = data.description || '';
-  if (ui.details()) {
-    ui.details().textContent = `Umidità ${data.humidity ?? '—'}% • Vento ${toDisplayWind(data.wind_speed)}`;
+function updateBannerLink() {
+  const banner = document.getElementById('view7DaysBanner');
+  const bannerSection = document.getElementById('bannerSection');
+  if (banner) {
+    banner.href = `/pages/view7days.html?city=${encodeURIComponent(currentCity)}`;
   }
-
-  if (data.forecast) {
-    await renderForecast(data.forecast);
+  if (bannerSection) {
+    bannerSection.style.display = 'block';
   }
 }
 
-async function loadPrefsAndWeather(user) {
+async function loadWeather() {
+  const loading = document.getElementById('loadingBox');
+  if (loading) loading.style.display = 'flex';
+
   try {
-    const prefsRef = doc(db, 'users', user.uid);
-    const snap = await getDoc(prefsRef);
-    if (!snap.exists()) return;
+    weatherData = await fetchWeatherByCity(currentCity, currentUnits);
+    if (loading) loading.style.display = 'none';
 
-    const data = snap.data();
-    currentUnits = data.prefUnits || 'metric';
-
-    if (data.prefCity) {
-      if (ui.cityInput()) ui.cityInput().value = data.prefCity;
-      const weather = await fetchWeatherByCity(data.prefCity, currentUnits);
-      await renderWeather(weather);
-    }
+    renderHeroCard(weatherData);
+    renderHourlyCapsules(weatherData);
+    updateBannerLink();
   } catch (err) {
-    console.error(err);
+    if (loading) {
+      loading.innerHTML = `<p style="color:var(--danger)">Errore: ${err.message}</p>`;
+    }
   }
 }
 
-function hookUI() {
-  const profileBtn = document.getElementById('profileBtn');
-  const logoutBtn = document.getElementById('logoutBtn');
+function initIcons() {
+  const navLoc = document.getElementById('navLocationIcon');
+  if (navLoc) navLoc.innerHTML = getIconSvg('location');
 
-  if (profileBtn) profileBtn.onclick = () => window.location.href = '/pages/profile.html';
-  if (logoutBtn) {
-    logoutBtn.onclick = async () => {
-      if (confirm('Vuoi uscire?')) {
-        await signOut(auth);
-        window.location.href = '/pages/login.html';
-      }
-    };
-  }
+  const navProf = document.getElementById('navProfileIcon');
+  if (navProf) navProf.innerHTML = getIconSvg('profile');
 
-  ui.searchBtn()?.addEventListener('click', async () => {
-    const city = ui.cityInput()?.value.trim();
-    if (!city) return alert('Inserisci una città');
+  const windIcon = document.getElementById('heroWindIcon');
+  if (windIcon) windIcon.innerHTML = getIconSvg('wind', 'mini-pill-svg');
 
-    if (ui.loading()) ui.loading().style.display = 'block';
-    try {
-      const data = await fetchWeatherByCity(city, currentUnits);
-      await renderWeather(data);
-    } catch (err) {
-      alert(err.message);
-      if (ui.loading()) ui.loading().style.display = 'none';
-    }
-  });
+  const uvIcon = document.getElementById('heroUvIcon');
+  if (uvIcon) uvIcon.innerHTML = getIconSvg('uv', 'mini-pill-svg');
+
+  const humIcon = document.getElementById('heroHumidityIcon');
+  if (humIcon) humIcon.innerHTML = getIconSvg('droplet', 'mini-pill-svg');
+
+  const bannerArrow = document.getElementById('bannerArrowIcon');
+  if (bannerArrow) bannerArrow.innerHTML = getIconSvg('arrowRight');
+
+  const modalClose = document.getElementById('modalCloseIcon');
+  if (modalClose) modalClose.innerHTML = getIconSvg('close');
+
+  const modalWindIcon = document.getElementById('modalStatWindIcon');
+  if (modalWindIcon) modalWindIcon.innerHTML = getIconSvg('wind', 'modal-stat-svg');
+
+  const modalUvIcon = document.getElementById('modalStatUvIcon');
+  if (modalUvIcon) modalUvIcon.innerHTML = getIconSvg('uv', 'modal-stat-svg');
+
+  const modalRainIcon = document.getElementById('modalStatRainIcon');
+  if (modalRainIcon) modalRainIcon.innerHTML = getIconSvg('droplet', 'modal-stat-svg');
+
+  const modalHumIcon = document.getElementById('modalStatHumIcon');
+  if (modalHumIcon) modalHumIcon.innerHTML = getIconSvg('thermometer', 'modal-stat-svg');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  hookUI();
+  initIcons();
+
+  // Modal close handlers
+  const closeBtn = document.getElementById('modalCloseBtn');
+  if (closeBtn) closeBtn.addEventListener('click', closeHourlyModal);
+
+  const bottomCloseBtn = document.getElementById('modalBottomCloseBtn');
+  if (bottomCloseBtn) bottomCloseBtn.addEventListener('click', closeHourlyModal);
+
+  const modal = document.getElementById('hourlyModal');
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeHourlyModal();
+    });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeHourlyModal();
+  });
+
+  // Logout
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async () => {
+      if (confirm('Vuoi uscire dal tuo account?')) {
+        await signOut(auth);
+        window.location.href = '/pages/login.html';
+      }
+    });
+  }
+
+  // Controlla città attiva da URL o localStorage
+  const urlParams = new URLSearchParams(window.location.search);
+  const cityFromUrl = urlParams.get('city');
+  const cityFromStorage = localStorage.getItem('mdev_selected_city');
+
+  if (cityFromUrl) {
+    currentCity = cityFromUrl;
+  } else if (cityFromStorage) {
+    currentCity = cityFromStorage;
+  }
 
   onAuthStateChanged(auth, async (user) => {
     if (user) {
-      await loadPrefsAndWeather(user);
-    } else if (!window.location.pathname.includes('/pages/login.html')) {
-      window.location.href = '/pages/login.html';
+      try {
+        const snap = await getDoc(doc(db, 'users', user.uid));
+        if (snap.exists()) {
+          const uData = snap.data();
+          currentUnits = uData.prefUnits || 'metric';
+          if (!cityFromUrl && !cityFromStorage && uData.prefCity) {
+            currentCity = uData.prefCity;
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
     }
+    loadWeather();
   });
 });
-
-export async function saveUserPrefs(userId, prefs) {
-  try {
-    await setDoc(doc(db, 'users', userId), prefs, { merge: true });
-    return true;
-  } catch (err) {
-    console.error(err);
-    throw err;
-  }
-}
-
-export async function loadUserPrefs(userId) {
-  const prefsRef = doc(db, 'users', userId);
-  const snap = await getDoc(prefsRef);
-  return snap.exists() ? snap.data() : null;
-}

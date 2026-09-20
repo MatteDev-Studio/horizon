@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Previsioni 7 Giorni — Meteo</title>
+  <link rel="stylesheet" href="/css/app.css">
+  <meta name="theme-color" content="#1a365d">
+</head>
+<body class="weather-app-page">
+  <div class="app-container">
+    <header class="page-nav-bar">
+      <a href="/dashboard.html" class="btn-back" id="backBtn">
+        <span id="backArrowIcon"></span>
+        <span>Torna a Oggi</span>
+      </a>
+      <a href="/pages/selectcity.html" class="city-pill-btn" id="changeCityBtn" title="Cambia città">
+        <span id="locationIconWrap"></span>
+        <span id="activeCityLabel">Caricamento...</span>
+      </a>
+    </header>
+
+    <main class="view7days-main">
+      <div class="view7days-head">
+        <h1 class="view7days-title">Previsioni per i prossimi 7 giorni</h1>
+        <p class="view7days-subtitle muted" id="weekRangeSubtitle">Panoramica completa giorno per giorno</p>
+      </div>
+
+      <div id="loadingWeek" class="card loading-box">Caricamento previsioni in corso...</div>
+
+      <div id="weekCardsContainer" class="week-cards-grid" style="display:none"></div>
+    </main>
+  </div>
+
+  <script type="module" src="/js/view7days.js"></script>
+</body>
+</html>

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Seleziona Città — Meteo</title>
+  <link rel="stylesheet" href="/css/app.css">
+  <meta name="theme-color" content="#1a365d">
+</head>
+<body class="weather-app-page">
+  <div class="app-container">
+    <header class="page-nav-bar">
+      <a href="/dashboard.html" class="btn-back" id="backBtn">
+        <span id="backArrowIcon"></span>
+        <span>Torna al meteo</span>
+      </a>
+      <h2 class="nav-title">Cerca Città</h2>
+    </header>
+
+    <main class="select-city-main">
+      <div class="search-box-wrap">
+        <div class="search-input-field">
+          <span id="searchIconWrap" class="search-field-icon"></span>
+          <input type="text" id="citySearchInput" placeholder="Cerca città nel mondo..." autocomplete="off" autofocus />
+          <button type="button" id="clearSearchBtn" class="clear-search-btn" style="display:none" title="Cancella">✕</button>
+        </div>
+        <button type="button" id="searchSubmitBtn" class="btn-primary search-submit-btn">Cerca</button>
+      </div>
+
+      <button type="button" id="gpsBtn" class="btn-gps">
+        <span id="gpsIconWrap"></span>
+        <span>Usa la mia posizione attuale</span>
+      </button>
+
+      <!-- Risultati Ricerca -->
+      <section id="searchResultsSection" class="city-section" style="display:none">
+        <h3 class="section-title">Risultati</h3>
+        <div id="searchResultsList" class="city-list"></div>
+      </section>
+
+      <!-- Ricerche Recenti -->
+      <section id="recentSection" class="city-section" style="display:none">
+        <div class="section-head-row">
+          <h3 class="section-title">Ricerche recenti</h3>
+          <button type="button" id="clearRecentBtn" class="btn-ghost-small">Cancella</button>
+        </div>
+        <div id="recentList" class="city-chips-grid"></div>
+      </section>
+
+      <!-- Città Consigliate / Popolari -->
+      <section class="city-section">
+        <h3 class="section-title">Città consigliate</h3>
+        <div class="city-chips-grid" id="popularCities">
+          <button type="button" class="city-chip" data-city="Roma">Roma, IT</button>
+          <button type="button" class="city-chip" data-city="Milano">Milano, IT</button>
+          <button type="button" class="city-chip" data-city="Napoli">Napoli, IT</button>
+          <button type="button" class="city-chip" data-city="Torino">Torino, IT</button>
+          <button type="button" class="city-chip" data-city="Firenze">Firenze, IT</button>
+          <button type="button" class="city-chip" data-city="Bologna">Bologna, IT</button>
+          <button type="button" class="city-chip" data-city="Palermo">Palermo, IT</button>
+          <button type="button" class="city-chip" data-city="Venezia">Venezia, IT</button>
+          <button type="button" class="city-chip" data-city="Parigi">Parigi, FR</button>
+          <button type="button" class="city-chip" data-city="Londra">Londra, UK</button>
+          <button type="button" class="city-chip" data-city="Madrid">Madrid, ES</button>
+          <button type="button" class="city-chip" data-city="Berlino">Berlino, DE</button>
+          <button type="button" class="city-chip" data-city="Tokyo">Tokyo, JP</button>
+          <button type="button" class="city-chip" data-city="New York">New York, US</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="/js/selectcity.js"></script>
+</body>
+</html>
